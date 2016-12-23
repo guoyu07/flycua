@@ -1,0 +1,326 @@
+// JavaScript Document
+
+
+$(function(){
+	
+	$(window).resize(function(){
+		resize();
+	});
+	resize();
+	
+	$('#sendBtn').click(function(){
+		if(_robotMode){
+			var val=$('#clientMessageBox').val();
+			if(val == ""){
+				
+			}else{
+				val = _chat_emote.emoteParse(val);
+				sendMsg(val);
+			}
+		} else{
+			if(_sessionActive && _sessionId != -1){
+				var val=$('#clientMessageBox').val();
+				if(val == ""){
+					
+				}else{
+					val = _chat_emote.emoteParse(val);
+					sendMsg(val);
+				}
+			}
+		}
+	});
+//	$("#clientMessageBox").focus(function(){
+//		sendMsg("focus");
+//	});
+//	$("#clientMessageBox").blur(function(){
+//		sendMsg("blur");
+//	});
+	
+	$('#backBtn').click(function(){
+		if(_sessionActive){
+			if($('.viewport').css('display') === 'block'){
+				$('.win_comment,.sreen01').show();
+			}
+			
+		}else{
+			closeWeixin();
+			closeApp();
+		}
+	});
+	
+	function closeWeixin(){
+		try{
+			WeixinJSBridge.invoke('closeWindow',{},function(res){
+				//alert(res.err_msg);
+			});
+		}catch(e){}
+	}
+	function closeApp(){
+		try{
+			window.artInjected.toString();
+		}catch(e){}
+	}
+
+	$('.face_button').click(function(){
+		$('.facestyle_wrap').toggle();
+		$('.fixed_box').toggleClass('fixed_box_position');
+		$('.content_box').toggleClass('content_box_pb');
+
+	});
+	$('.doc_add, .input_wrap,.text_btn').click(function(){
+		$('.facestyle_wrap').hide();
+		$('.fixed_box').removeClass('fixed_box_position');
+		$('.content_box').removeClass('content_box_pb');
+		$('.face_button').html('<img src="'+_baseURL+'/images/icon_face.png"/>')
+	});
+	
+	$('.face_button').toggle(
+		function () {
+			$('.face_button').html('<img src="'+_baseURL+'/images/icon_face_click.png"/>')
+		}, function () {
+			$('.face_button').html('<img src="'+_baseURL+'/images/icon_face.png"/>')
+		});
+
+	$(".p5-dd ,.p4-dd ,.p3-dd ,.p2-dd ,.p1-dd").on("click", function(){
+		
+		rateContect = $(this).attr('data');
+		rateContectid = $(this).attr('rateId');
+		if($(this).children('i').hasClass('selected')){
+			$(this).children('i').removeClass('selected');
+			
+		}
+		else{
+			$(this).children('i').addClass('selected');
+			$(this).siblings().find('i').removeClass('selected');
+		}
+	});	
+	
+	
+	$('#okBtn').on("click", function(){
+		if(_sessionId == -1){//in requesting
+			doAjaxCall(ajaxURL,"requestType=send&data="+getCancelRequestJSON(),null);
+			//closeWeixin();
+			//closeApp();
+			window.location='http://m.flycua.com';
+		}else{//in chatting
+			$('.viewport').hide();
+			$('.comment').show();
+			$('.win_comment,.sreen01,.quit,.fixed_box').hide();
+			endSessionBtnClickHandler();
+		}
+	});
+	
+	$("#cancelBtn").on("click", function(){
+		$('.win_comment,.sreen01').hide();
+	});
+
+	$(document).click(function(e){
+//		e = window.event || e;
+//		obj = $(e.srcElement || e.target);
+//		if (!$(obj).is(".back,win_ok *")) {
+//			$('.win_comment,.sreen01').hide();
+//		}
+	});
+
+	
+	var hasFlower = true;
+	$('#bad').click(function(){
+		hasFlower = false;
+		$('.suggest_textarea').show();
+		$('.tip02').show();
+		$('.tip01').hide();
+	});
+	$('#send_flower').click(function(){
+		hasFlower = true;
+		$('.suggest_textarea').hide();
+		$('.tip01').show();
+		$('.tip02').hide();
+	});
+	
+	
+	function countWords(len, words){
+		var w = $("#"+words);
+		var i = w.find("i");
+		var num = w.attr("num");
+		var lastNum = parseInt(num)-len;
+		if (lastNum < 10) {
+			i.addClass("red");
+		} else {
+			i.removeClass("red");
+		}
+		if(lastNum < 0){
+			i.html("0");
+			return false;
+		}else{
+			i.html(lastNum);
+			return true;
+		}
+	}
+	var pjCountAvailable = true;
+	$("#ratingComments").on("keyup", function(){
+		var len = $(this).val().length;
+		pjCountAvailable = countWords(len, "lastWords");
+		if(!pjCountAvailable){
+			var availableNum = parseInt($("#lastWords").attr("num"));
+			var content = $(this).val();
+			if(content.length > availableNum){
+				$(this).val(content.substring(0, availableNum));
+			}	
+		}
+	});
+	
+
+	$('.submit-satisfaction').click(function(){
+		if($(".selected").parent().attr("rateid")){
+			$.ajax({
+				method : "post",
+				url : ajaxURL,
+				data : {
+					requestType: "rateSession", 
+					data: getSessionRatingJSON($(".selected").parent().attr("rateid"),$(".selected").parent().attr("data"))
+				}
+			}).success(function(){
+				$("#ratingComments").val("");
+				_hasRating = true;
+				if($(".selected").parent().attr("rateid")>3){
+					$('.over_tip,.sreen02 ,.tip02').show(10).delay(1000).hide(10);
+				} else{
+					$('.over_tip,.sreen02 ,.tip01').show(10).delay(1000).hide(10);
+				}
+				
+				setTimeout(function(){
+					window.location='http://m.flycua.com';
+					closeWeixin();
+					closeApp();
+				}, 1025);
+			}).fail(function(){
+				alert("评价失败");
+			});
+		}
+	});
+	
+	function resize(){
+		$('.viewport').css('padding-top',$('header').height());
+		$('.comment').css('margin-top',$('header').height()+10);
+
+	    $('.window').css('top',($(window).height()-$('.window').height())/3);
+		$('.over_tip').css('top',($(window).height()-$('.over_tip').height())/3);
+	}
+
+	
+	$(".history").on("click",function(){
+		if(_sessionActive && _sessionId != -1){
+		//console.log("加载历史信息");
+		$.ajax({
+			url: 'jsp/lianhang/getHisttory.jsp',
+			type: 'POST',
+			data: {
+				customer_guid: _clientId,
+				historySessionId: _sessionId,
+				historyBtnTimes:_historyBtnTimes
+			},
+			success: function(data) {
+				_historyBtnTimes ++;
+				if(data.result == 1){
+					$('#clientResponseDiv').prepend(data.data);
+					$("#viewport").scrollTop('-'+$("#clientResponseDiv").height());
+				} else{
+					$("#viewport").scrollTop('-'+$("#clientResponseDiv").height());
+					$('#noHistoryContext').show('1000').delay('1500').hide('1000');
+					
+				}
+				
+			}
+		});	
+		} else{
+			alert('没有接入进入坐席聊天。');
+		}
+	})
+	
+	
+	//回车事件绑定
+    $('#clientMessageBox').bind('keyup', function(event) {
+        if (event.keyCode == "13") {
+            //回车执行查询
+        	$('#sendBtn').click();
+        }
+    });
+	
+
+	$("#attachInput").change(function(){
+		var file = this.files[0];
+		lrz(file, {width: 400, quality: 0.6}, function (results) {
+			uploadToServer(file, results.base64);
+		});
+		$(this).val("");
+	});
+	
+	var uploadToServer = function(oldFile,newFile) {							
+		//submit formData using $.ajax
+		var fileName = new Date().getTime()+oldFile.name.substring(oldFile.name.indexOf("."));
+		$.ajax({
+			url: 'uploadDataURI',
+			type: 'POST',
+			data: {
+				filename: fileName,
+				filetype: oldFile.type,
+				dataURI: newFile
+			},
+			success: function(data) {
+				var img = '<img  src="' + data.url + '" title="' + data.name + '"/>';
+				sendMsg(img);
+			}
+		});	
+	}
+	
+	
+	function sendMsg(msg){
+		if(!_robotMode){
+			$('#clientResponseDiv').append(
+					'<div class="user clear_box">'+
+		        	'<dl>'+
+		            	'<dt><img src="'+_baseURL+'/images/customer.png"/></dt>'+
+		                '<dd>'+
+		                	'<p><em>'+msg+'</em></p>'+
+		                    '<div class="jiao_user"></div>'+
+		                '</dd>'+
+		            '</dl>'+
+		        '</div>'
+				);
+				$('#clientMessageBox').val('');
+				var top=$(document).height()-$(window).height()+$('.user').outerHeight(true);
+				$(document).scrollTop($("#clientResponseDiv").height());
+				doAjaxCall(ajaxURL,"requestType=send&data="+getPostMessageSentInfoJSON(encodeURIComponent(msg.replace(/"/g,"'"))),null);
+		} else{
+				$('#clientMessageBox').val('');
+				$.ajax({
+					url:"servlet/RobotSearchServlet",
+					type:"POST",
+					data:{action:"search",question:msg},
+					timeout:30000,
+					dataType:"json",
+					success:function(data){
+				    	var message=genericMessage(data);
+						$("#clientResponseDiv").append(message);
+						var top=$(document).height()-$(window).height()+$('.user').outerHeight(true);
+						$(document).scrollTop($("#clientResponseDiv").height());
+					}
+				}).always(function(){
+					var top=$(document).height()-$(window).height()+$('.user').outerHeight(true);
+					$(document).scrollTop($("#clientResponseDiv").height());
+				});
+				
+		}
+	}
+	
+	$(".link").click(function(){
+		$(".win_link").css("display","block");
+	})
+	$(".win_close").click(function(){
+		$(".win_link").css("display","none");
+	})
+});
+	
+
+		
+		

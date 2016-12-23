@@ -1,0 +1,536 @@
+var _debug=false;
+var _maxRetry=5;
+var _retryTimes=0;
+var _timeoutForPull=3000;
+var _queue;
+var _clientId;
+var _clientFirstName;
+var _clientName;
+var _chatRequestId=-1;
+var _thisSessionId=-1;
+var _sessionId=-1;
+var _ratingSessionId=-1;
+var _preMsgUserId="-1";
+var ajaxURL="jsonHttpRemote.do";
+var _pullTimer;
+var _windowInFocus=false;
+var _clientMessageBoxInFocus = false;
+var _sessionActive=true;
+var _lastPullTime;
+var typingTimer=null;
+var _typingNotificationDelay=10;
+var _checkAFKTimeout=600;
+var _allowSaveChat = false;
+var _showWaitingView = true;
+
+var _robotMode = true;
+var _privousText = "";
+var _affectEditorChange = true;
+var _sendShortcutType = 0;//0 or 1
+var _userInfoMap = {};
+
+var CLIENT_CLOSE = 0;
+var AGENT_CLOSE = 1;
+var CLIENT_AFK_CLOSE = 2;
+var _chatTime =0;
+
+//历史记录
+var _historyBtnTimes = 0;
+
+var requestStatusArr = new Array();
+requestStatusArr['waiting'] = 0;
+requestStatusArr['accepted'] = 1;
+requestStatusArr['refused'] = 2;
+requestStatusArr['timeout'] = 3;
+requestStatusArr['updateNumInQueue']=8;
+requestStatusArr['blocked'] = 9;
+
+function formatFeedbackMessage(msg){
+    return "<p><em>"+msg+"</em></p>";
+}
+String.prototype.endWith=function(str){
+	if(str==null||str==""||this.length==0||str.length>this.length)
+	  return false;
+	if(this.substring(this.length-str.length)==str)
+	  return true;
+	else
+	  return false;
+	return true;
+}
+
+String.prototype.startWith=function(str){
+	if(str==null||str==""||this.length==0||str.length>this.length)
+	  return false;
+	if(this.substr(0,str.length)==str)
+	  return true;
+	else
+	  return false;
+	return true;
+}
+
+$(function(){
+	$("#close_div").click(function(){
+		if(_sessionActive){
+			endSessionBtnClickHandler();
+		}else{
+			window.close();
+		}
+	});	
+	initJavaScript();
+	writeLogToServer(_clientId+" userAgent: "+navigator.userAgent);
+	
+	_chat_emote.createEmotes();
+});
+
+function doAjaxCall(url, data, successFunc, failFunc){
+	$.ajax({
+        url: url,
+        data : data,
+        method:'POST',
+        cache: false,
+        contentType: "application/x-www-form-urlencoded; charset=GBK", 
+        error: function(jqXHR, textStatus, errorThrow){
+        	writeLogToServer("Ajax error: " + errorThrow + "  xhr status:" + jqXHR.status + " responseText: " + jqXHR.responseText);
+        },
+        success: function(response){
+            if (response == "NOT_LOGGED_IN"){
+                var userTypeId = (document.getElementById('userTypeId') != null? document.getElementById('userTypeId').value : null);                
+                alert("\u6ca1\u6709\u767b\u5f55\u6216\u8005\u592a\u957f\u65f6\u95f4\u6ca1\u6709\u64cd\u4f5c!");
+            	window.location='http://m.flycua.com';                
+            }
+            else{
+                if(successFunc){
+                   successFunc(response);
+                }
+            }
+    	}
+    });
+}
+
+function initJavaScript(){
+	_clientFirstName=document.forms["chatForm"].elements["clientFirstName"].value;
+	_clientName=_clientFirstName+" "+document.forms["chatForm"].elements["clientLastName"].value;
+	_clientId=document.forms["chatForm"].elements["clientId"].value;
+	_queue=document.forms["chatForm"].elements["queue"].value;
+	_timeoutForPull=document.forms["chatForm"].elements["timeoutForPull"].value;
+	doAjaxCall(ajaxURL,"requestType=send&data="+getNewClientRequestJSON(),processSendReturn);
+}
+
+function getNewClientRequestJSON(){
+	console.log("创建会话");
+	$.ajax({
+        url: "jsp/lianhang/showNotice.jsp",
+        data : '',
+        method:'GET',
+        cache: false,
+        contentType: "application/json; charset=UTF-8", 
+        error: function(jqXHR, textStatus, errorThrow){
+        	writeLogToServer("Ajax error: " + errorThrow + "  xhr status:" + jqXHR.status + " responseText: " + jqXHR.responseText);
+        },
+        success: function(response){
+        	console.log(response);
+        	if(response.result == 1){
+        		if(response.data.length > 0){
+            		var messageContent='<div class="wait_box"><ul>' +
+					   '<li class="tip">通知：</li>';
+            		for(var i=0 ;i < response.data.length;i++){
+            			messageContent+='<li class="list-content">';
+            			messageContent+='<a onclick=showContext("'+id+count+'") href="###">'+response.data[i].TITLE+'</a>';
+    	    			messageContent+='<div id="message-preview'+id+count+'" class="hide">'+response.data[i].questions_desc+"</div>";
+    	    			messageContent+="</li>";
+    	    			count++;
+            		}
+            		messageContent+="</ul><div>";
+            		$("#clientResponseDiv").append(messageContent);
+        		}
+        		
+        	}
+        	
+    	}
+    });
+	var j={actionType:"clientRequest",senderId:_clientId,senderName:_clientName,queueId:_queue,urlFrom:""};
+	return JSON.stringify(j);
+}
+
+function processSendReturn(jsonResponse){
+	if(jsonResponse.status=="success"){
+		var receivedInfo=jsonResponse.sendResponse;
+		_chatRequestId=receivedInfo.chatRequestId;
+		var orderInQueue=receivedInfo.orderInQueue;
+		if(orderInQueue==-1 || orderInQueue==-2){
+			_sessionActive=false;
+		}else{
+			_pullTimer = setTimeout("pullFromServer();",_timeoutForPull);
+			setInterval(checkForPull, 10000);
+		}
+		showChatView(orderInQueue);
+	}
+}
+
+function showChatView(orderInQueue){
+	if(orderInQueue==-1){
+		
+	}else if(orderInQueue == -2){
+		$("#waitingForAcceptInChatView").html($("#notInWorkTimeMessage").val());
+	}else{
+		var currentPositionInQueueMessage=$("#currentPositionInQueueMessage").val();
+		if(currentPositionInQueueMessage.indexOf("{0}")>=0){
+			currentPositionInQueueMessage=currentPositionInQueueMessage.replace(/\{0\}/g,"<span id='orderInQueue'>"+orderInQueue+"</span>");
+		}
+		$("#waitingForAcceptInChatView").html(formatFeedbackMessage(currentPositionInQueueMessage));
+	}
+	
+}
+
+function pullFromServer(){
+	try{
+		if(_sessionActive){
+			_lastPullTime=new Date().getTime();
+			doAjaxCall(ajaxURL, "requestType=pull&data=" + getPullSendInfoJSON(), callbackForPull);
+		}
+	}catch(j){
+		writeLog("Error occurred on pullFromServer, error message: "+j.getMessage());
+		alert("error message: "+j.getMessage());
+	}
+}
+
+function getPullSendInfoJSON(){
+	var x={senderId:_clientId};
+	if(_chatRequestId!=-1){
+		var r=new Array();
+		r.push(_chatRequestId);
+		x.chatRequestIdsFromUser=r;
+	}if(_sessionId!=-1){
+		var j=new Array();
+		j.push(_sessionId);
+		x.sessionIds=j;
+	}
+	return JSON.stringify(x);
+}
+function callbackForPull(j){
+	if(j==null){
+		alert("Nothing received from server");
+	}else{
+		if(j=="retry"){
+			_retryTimes=_retryTimes+1;
+			if(_retryTimes>_maxRetry){
+				alert("Either server is down or you have encountered an error. Please contact system administrator.");
+			}
+		}else{
+			_retryTimes=0;
+			processPullReturn(j);
+		}
+	}
+	if(_sessionActive){
+		_pullTimer = setTimeout("pullFromServer();",_timeoutForPull);
+	}else{
+		writeLog("Stop pullFromServer for session "+_thisSessionId+" hence sessionActive is "+_sessionActive);
+	}
+}
+function processPullReturn(jsonResponse){
+	if(jsonResponse.status=="success"){
+		var receivedInfo=jsonResponse.pullResponse;
+		var chatRequestsFromUser=receivedInfo.chatRequestsFromUser;
+		if(chatRequestsFromUser!=null&&chatRequestsFromUser!=""&&chatRequestsFromUser.length>0){
+			var chatRequest=chatRequestsFromUser[0];
+			var status=chatRequest.status;
+			if(status==requestStatusArr["accepted"]){
+				_robotMode = false;
+				$(".text_icon ").show();
+				setInterval(function(){
+					_chatTime++;
+					if(parseInt(_chatTime/60)>0){
+						$("header em").eq(1).html(parseInt(_chatTime/60)+"分"+_chatTime%60+"秒")
+					} else{
+						$("header em").eq(1).html(_chatTime%60+"秒")
+					}
+					
+					
+				}, 1000);
+				var feedbackMessage=chatRequest.feedbackMessage;
+				$("#waitingForAcceptInChatView").hide();
+				_sessionId=chatRequest.sessionId;
+				_thisSessionId=_sessionId;
+				doAjaxCall(ajaxURL, "requestType=setCurrentChatSessionId&sessionId=" + _sessionId, null);
+				_chatRequestId=-1;
+								
+				appendTextToLetvDiv("clientResponseDiv",formatFeedbackMessage(feedbackMessage));
+				
+				
+			}else{
+				if(status==requestStatusArr["timeout"]){
+					_sessionActive=false;
+					$("#waitingForAcceptInChatView").html($("#allAgentBusyMessage").val());
+				}else if(status==requestStatusArr["updateNumInQueue"]){
+					var feedbackMessage=chatRequest.feedbackMessage;		
+					$("#orderInQueue").html(feedbackMessage);
+				}else if(status==requestStatusArr["blocked"]){
+					var feedbackMessage=chatRequest.feedbackMessage;
+					$("#waitingForAcceptInChatView").html(feedbackMessage);
+				}
+			}
+		}
+		var sessions=receivedInfo.sessions;
+		if(sessions!=null&&sessions!=""&&sessions.length>0){
+			var session=sessions[0];
+			var processedNotices=new Array();
+			var sessionChangeNotices=session.sessionChangeNotices;
+			if(sessionChangeNotices!=null&&sessionChangeNotices!=""&&sessionChangeNotices.length>0){
+				for(var sessionChangeNoticeIndex=0;sessionChangeNoticeIndex<sessionChangeNotices.length;sessionChangeNoticeIndex++){
+					var notice = sessionChangeNotices[sessionChangeNoticeIndex];
+					var noticeMessage = notice.message;
+					if(noticeMessage != ""){
+						if(noticeMessage.indexOf("typingNotice_")!=-1){
+							noticeMessage = noticeMessage.substring(13, noticeMessage.length);
+						}else{
+							processedNotices[processedNotices.length]=formatFeedbackMessage(noticeMessage);
+						}
+					}
+				}
+			}
+			var newMessages=session.newMessages;
+			if(newMessages!=null&&newMessages!=""&&newMessages.length>0){
+				for(var newMessageIndex=0;newMessageIndex<newMessages.length;newMessageIndex++){
+					var newMessage=newMessages[newMessageIndex];
+					var text=newMessage.text;
+					if(text!=null&&text!=""){
+						var userId=newMessage.userId;
+						var userName=newMessage.userName;
+						var displayMsg=getDisplayMessage(_preMsgUserId,userId,userName,text);
+						appendTextToLetvDiv("clientResponseDiv",displayMsg);
+						$(document).scrollTop($("#clientResponseDiv").height());
+						_preMsgUserId=userId;
+					}
+				}
+			}
+			for(var i=0;i<processedNotices.length;i++){
+				appendTextToLetvDiv("clientResponseDiv",processedNotices[i]);
+			}
+			if(processedNotices.length>0){
+				
+			}
+			
+			var ifShouldEnd=session.ifShouldEnd;
+			if(ifShouldEnd){
+				var sessionEndingMessage=document.getElementById("sessionEndingMessage").value;
+				appendTextToLetvDiv("clientResponseDiv",formatFeedbackMessage(sessionEndingMessage));
+				_sessionActive=false;
+				$('.win_ok').click();
+				_sessionId=-1;
+			}
+		}
+		//lori added 20100320
+		var needChange=receivedInfo.needChange;
+		if(needChange){
+			var newClient=receivedInfo.newClient;
+			_clientId=newClient.id;
+		}
+	}
+}
+
+function getPostMessageSentInfoJSON(j){
+	var r={senderId:_clientId,actionType:"postMessage",sessionId:_sessionId,message:j};
+	return JSON.stringify(r);
+}
+
+
+
+function getDisplayMessage(preMsgUserId, userId, name, msg){
+	var result = "";
+	if(userId == "-1"){
+		result = formatFeedbackMessage(msg);
+	}else{
+		if(userId == _clientId){
+            result = '<div class="user clear_box">'+
+	            	'<dl>'+
+	                	'<dt><img src="'+_baseURL+'/images/customer.png"/></dt>'+
+	                    '<dd>'+
+	                    	'<p><em>'+val+'</em></p>'+
+	                        '<div class="jiao_user"></div>'+
+	                    '</dd>'+
+	                '</dl>'+
+	            '</div>';
+		}else{
+			result = '<div class="custom_service clear_box">'+
+	        	'<dl>'+
+	            	'<dt><img src="' + _baseURL +'/images/img_1.png"/></dt>'+
+	                '<dd>' +
+	                	'<div class="say_h pd_b1">' +
+                        	'<p><em>'+msg+'</em></p>' +
+                        '</div>' +
+                    	'<div class="jiao"></div>' +
+	                '</dd>'+
+	            '</dl>'+
+	        '</div>';
+		}
+		
+	}
+	return result;
+}
+
+function getIconUrlById(userId){
+	var userInfo = _userInfoMap[userId];
+	if(!userInfo){
+		_userInfoMap[userId] = {icon_url:  _baseURL + '/images/img_1.png'};
+		$.ajax({
+			method: "post",
+			url: "jsp/letv/new/letvFetchAgentInfo.jsp",
+			data: {
+				userId : userId
+			},
+			async: false,
+			dataType: "json",
+			success: function(data){
+				if(data.status == 1){
+					_userInfoMap[userId] = data.staff;
+				}
+			}
+		});
+		userInfo = _userInfoMap[userId];
+	}
+	return userInfo.icon_url;
+}
+
+function cancelRequest(x){
+	var j=$("#confirmRequestCancelMessage").value();
+	var r=confirm(j);
+	if(r!=0){
+		doAjaxCall(ajaxURL,"requestType=send&data="+getCancelRequestJSON(),null);
+		_sessionActive=false;
+		$("#waitingForAccept").html($("#requestCancelledMessage").val());
+	}
+}
+
+function getCancelRequestJSON(){
+	var j={actionType:"cancelRequest",chatRequestId:_chatRequestId};
+	return JSON.stringify(j);
+}
+function endSessionBtnClickHandler(){
+	endSession(CLIENT_CLOSE);
+}
+function endSession(closeType){
+	var j={actionType:"closeSession",senderId:_clientId,senderName:_clientName,sessionId:_sessionId,closeType:closeType};
+	doAjaxCall(ajaxURL,"requestType=send&data="+JSON.stringify(j),null);
+	_sessionId=-1;
+	_sessionActive=false;
+	_ratingSessionId=_sessionId;
+}
+
+function getSessionRatingJSON(ratingId,comments){
+	var r={clientId:_clientId,chatSessionId:_thisSessionId,ratingId:ratingId,ratingComment:comments};
+	return JSON.stringify(r);
+}
+
+
+function substrByBytes(source,maxLength){
+	var remainLength=source.length,length=maxLength;
+	var result=source.substring(0,maxLength);
+	while(remainLength>maxLength){
+		result=result.substring(0,length--);
+		remainLength=result.replace(/[^\x00-\xff]/g,"xx").length;
+	}
+	return result;
+}
+
+function appendTextToLetvDiv(divId, data){
+	var targetDiv = $("#"+divId);
+    targetDiv.append(data);
+    
+    var top=$(document).height()-$(window).height()+$('.user').outerHeight(true);
+	$(document).scrollTop(top);
+}
+
+
+
+function focusClientMessageBox(){
+	if(!_windowInFocus && !_clientMessageBoxInFocus){
+		window.focus();
+	}
+	var j=document.getElementById("clientMessageBox");
+	var r=(j.style.visibility=="hidden")||(j.disabled);
+	if(!r){
+		$("#clientMessageBox").focus();
+	}
+}
+
+var _lastTypingNotificationTime=0;
+function enterSubmit(x,n,o,j){
+	if(reachedMaxLength(x,j,o)){
+		trimTextArea(x,j);
+	}
+	var r=new Date().getTime();
+	var C=getKeyCode(o);
+	if(C==13){
+		var e = o || window.event;
+		if(!e.shiftKey){
+			_lastTypingNotificationTime=0;
+			n(x);
+			return false;
+		}
+	}
+	if((r-_lastTypingNotificationTime)>=(_typingNotificationDelay*1000)){
+		_lastTypingNotificationTime=r;
+		var Y="requestType=sendTypingNotification&sessionId="+_sessionId;
+		doAjaxCall(ajaxURL,Y,null);
+	}
+	return true;
+}
+
+function callbackOnWindowClose(){ //todo: this will be activated by both close window and transfer to another page
+	$.ajax({
+		url:"jsonHttpRemote.do",
+		data:"requestType=closeWindow&sessionId="+_sessionId+"&chatRequestId="+_chatRequestId,
+		async:false
+	});
+    document.close();
+    return;
+}
+ 
+function callbackOnBeforeWindowClose(){
+      return "";
+}
+
+
+function writeLog(content){
+	try{
+		if(console && console.log){
+			console.log(content);
+		}
+	}catch(e){}
+}
+
+function writeLogToServer(content){
+	doAjaxCall(ajaxURL,
+		{
+			requestType : "writeLog",
+		 	content : content
+		}
+	);
+	if(console && console.log){
+		console.log(content);
+	}
+}
+
+onerror = function(msg,url,l){
+	if(_pullTimer != null){
+		clearTimeout(_pullTimer);
+	}
+	_pullTimer = setTimeout("pullFromServer();",_timeoutForPull);
+	var txt="Error occurred on client chat page.   msg: "+msg+"  url: "+url+"  line: "+l;
+	writeLogToServer(txt);
+//	return true;
+}
+
+function checkForPull(){
+	if(_sessionActive){
+		var now = new Date().getTime();
+		var elapse = now - _lastPullTime;
+		if(elapse > 20 * 1000){
+			writeLog("[clientScript - checkForPull] client no pull for " + elapse + "ms" , true);
+			if(_pullTimer){
+				clearTimeout(_pullTimer);
+			}
+			_pullTimer = setTimeout("pullFromServer();", _timeoutForPull);
+		}
+	}
+}

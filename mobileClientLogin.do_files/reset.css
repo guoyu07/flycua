@@ -1,0 +1,245 @@
+@charset "utf-8";
+body, h1, h2, h3, p, dl, dd, ol, ul, th, td, form, fieldset, input, button, textarea {
+	margin: 0;
+	padding: 0;
+}
+
+html {
+	word-wrap: break-word;
+	/* -webkit-user-select: none; */
+}
+
+h1, h2, h3 {
+	font-size: 100%;
+}
+
+ol, ul {
+	list-style: none outside none;
+}
+
+table {
+	border-collapse: collapse;
+	border-spacing: 0;
+	empty-cells: show;
+	font-size: inherit;
+}
+
+fieldset, img {
+	border: 0 none;
+}
+
+cite, em, s, i, b {
+	font-style: normal;
+}
+
+input, button, textarea, select {
+	font-size: 100%;
+}
+
+body, input, button, textarea, select, option {
+}
+
+a, input, textarea {
+	outline: 0 none;
+	text-decoration: none;
+}
+
+li, img, label, input {
+	vertical-align: middle;
+}
+
+var {
+	font-style: normal;
+}
+
+ins {
+	text-decoration: none;
+}
+
+body {
+	font-size: 20px;
+}
+
+.viewport {
+	margin: 0 auto;
+	max-width: 640px;
+	overflow: hidden;
+}
+
+.mlr20 {
+	margin: auto 1em;
+}
+
+.m20 {
+	margin: 1em 0;
+}
+
+.m30 {
+	margin: 1.5em 0;
+}
+
+.mt20 {
+	margin-top: 1em;
+}
+
+.mb20 {
+	margin-bottom: 1em;
+}
+
+.mt40 {
+	margin-top: 2em;
+}
+
+.mb40 {
+	margin-bottom: 2em;
+}
+
+.mt-20 {
+	margin-top: -1em;
+}
+
+.hide {
+	display: none;
+}
+
+.h_box {
+	display: -moz-box;
+	display: -webkit-box;
+	display: box;
+	width: 100%;
+}
+
+.h_box .spacer {
+	width: 1em;
+}
+
+.flex_1 {
+	-webkit-box-flex: 1;
+	box-flex: 1;
+	-moz-box-flex: 1;
+	width: 100%;
+}
+
+.flex_20 {
+	width: 1em;
+}
+
+@media only screen and (max-width: 300px) {
+	body {
+		font-size: 10px;
+	}
+
+	.viewport {
+		max-width: 300px;
+	}
+}
+
+@media only screen and (max-width: 310px) and (min-width: 300px) {
+	body {
+		font-size: 10px;
+	}
+
+	.viewport {
+		max-width: 300px;
+	}
+}
+
+@media only screen and (max-width: 320px) and (min-width: 310px) {
+	body {
+		font-size: 10px;
+	}
+
+	.viewport {
+		max-width: 320px;
+	}
+}
+
+@media only screen and (max-width: 360px) and (min-width: 320px) {
+	body {
+		font-size: 10.5px;
+	}
+
+	.viewport {
+		max-width: 360px;
+	}
+}
+
+@media only screen and (max-width: 360px) and (min-width: 350px) {
+	body {
+		font-size: 10.5px;
+	}
+
+	.viewport {
+		max-width: 360px;
+	}
+}
+
+@media only screen and (max-width: 480px) and (min-width: 360px) {
+	body {
+		font-size: 10.5px;
+	}
+
+	.viewport {
+		max-width: 480px;
+	}
+}
+
+@media only screen and (max-width: 480px) and (min-width: 470px) {
+	body {
+		font-size: 12.3333px;
+	}
+
+	.viewport {
+		max-width: 480px;
+	}
+}
+
+@media only screen and (max-width: 560px) and (min-width: 480px) {
+	body {
+		font-size: 12.3333px;
+	}
+
+	.viewport {
+		max-width: 560px;
+	}
+}
+
+@media only screen and (max-width: 570px) and (min-width: 560px) {
+	body {
+		font-size: 13.8333px;
+	}
+
+	.viewport {
+		max-width: 570px;
+	}
+}
+
+@media only screen and (max-width: 640px) and (min-width: 570px) {
+	body {
+		font-size: 13.8333px;
+	}
+
+	.viewport {
+		max-width: 640px;
+	}
+}
+
+@media only screen and (max-width: 640px) and (min-width: 630px) {
+	body {
+		font-size: 15.7778px;
+	}
+
+	.viewport {
+		max-width: 640px;
+	}
+}
+
+@media only screen and (max-width: 710px) and (min-width: 640px) {
+	body {
+		font-size: 15.7778px;
+	}
+
+	.viewport {
+		max-width: 710px;
+	}
+}

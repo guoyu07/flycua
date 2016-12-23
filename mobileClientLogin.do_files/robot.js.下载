@@ -1,0 +1,64 @@
+var _kmURL = "";
+var id = new Date().getTime();
+var count = 0;
+function genericMessage(data){
+	console.log(data);
+	if(data!=null && data!=""){
+		try{
+			var messageContent='<div class="wait_box"><ul>' +
+						'<li class="tip">'+"提问的关键字："+data.question+'</li>';
+		    if(data.srs && data.srs.length>0){
+		    	for(var i=0;i<data.srs.length;i++){    	
+			    	var sr=data.srs[i];
+			    	messageContent+='<li class="list-content">';
+			    	var title = "unknow title";
+			    	if(sr.title.length>0){
+			    		title = sr.title;
+			    	}
+		    			messageContent+='<a onclick=showContext("'+id+count+'") href="###">'+title+'</a>';
+		    			messageContent+='<div id="message-preview'+id+count+'" class="hide">'+sr.preview;
+//				    	if(sr.ra){
+//				    		messageContent+='<a onclick=showAllContext("'+_kmURL+sr.ra.path+'") href="###">查看详情</a></div>';
+				    		messageContent+='<a onclick=showAllContext("http://www.baidu.com") href="###">查看详情</a></div>';
+//			    		}
+		    			count++;
+		    	}
+		    	messageContent+="</li>";
+		    }else{
+		    	messageContent+='<div class="show">'+"对不起，请输入具体业务相关的问题，谢谢！"+"</div>";
+		    	messageContent+="</li>";
+		    }
+		    
+		    messageContent+="</ul><div>";
+		    return messageContent;
+		}catch(e){
+			alert(e.message);
+		}
+	}
+    return "";
+}
+function   date2str(d){ 
+	var   ret=d.getFullYear()+ "- ";
+	ret+=( "00 "+(d.getMonth()+1)).slice(-2)+ "-"; 
+	ret+=( "00 "+d.getDate()).slice(-2)+ " "; 
+	ret+=( "00 "+d.getHours()).slice(-2)+ ":"; 
+	ret+=( "00 "+d.getMinutes()).slice(-2)+ ":"; 
+	ret+=( "00 "+d.getSeconds()).slice(-2);
+	return   ret; 
+}
+function   date2str2(d){ 
+	var   ret=( "00 "+d.getHours()).slice(-2)+ ":"; 
+	ret+=( "00 "+d.getMinutes()).slice(-2)+ ":"; 
+	ret+=( "00 "+d.getSeconds()).slice(-2);
+	return   ret; 
+}
+function showContext(id){
+	$("li .hide").hide()
+	$("#message-preview"+id).show();
+	$(document).scrollTop($("#clientResponseDiv").height());
+};
+
+function showAllContext(c){
+	$(".win_link").show();
+	$("#contentIframe").attr("src" ,c);
+};
